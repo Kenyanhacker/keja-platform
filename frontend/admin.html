@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel | KEJA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <video class="bg-video" autoplay muted loop playsinline aria-hidden="true">
+    <source src="../../models/Abstract White Background 4K - Motion Graphics Background Loop - White Video Loop - Free Stock Footage 4K (1080p, h264).mp4" type="video/mp4">
+  </video>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <header class="topbar glass">
+    <div class="container topbar-inner">
+      <div class="brand"><strong>KEJA</strong><span>Mtaani</span></div>
+      <div class="row-gap">
+        <a class="btn btn-secondary" href="./index.html">Homepage</a>
+        <button class="btn btn-primary" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding:18px 0 26px;">
+    <section class="hero-main reveal show slide-right">
+      <h1 style="font-size:2rem;">Admin Control Panel</h1>
+      <p id="adminWelcome" class="meta" style="margin-bottom:10px;"></p>
+      <p class="meta">Monitor users, hosts, listings, chats, and moderation actions.</p>
+    </section>
+
+    <section class="info-grid reveal show slide-up" style="margin-top:12px;">
+      <article>
+        <h3>Analytics</h3>
+        <div id="analytics" class="meta">Loading...</div>
+      </article>
+      <article>
+        <h3>Users</h3>
+        <div id="usersCount" class="meta">Loading...</div>
+      </article>
+      <article>
+        <h3>Listings</h3>
+        <div id="listingsCount" class="meta">Loading...</div>
+      </article>
+    </section>
+  </main>
+
+  <script src="./auth.js"></script>
+  <script>
+    const session = requireRole(["admin"]);
+    const welcome = document.getElementById("adminWelcome");
+    const analyticsNode = document.getElementById("analytics");
+    const usersNode = document.getElementById("usersCount");
+    const listingsNode = document.getElementById("listingsCount");
+
+    if (session) {
+      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
+
+      Promise.all([
+        fetch(`${API_BASE_URL}/admin/analytics`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json()),
+        fetch(`${API_BASE_URL}/admin/users`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json()),
+        fetch(`${API_BASE_URL}/admin/listings`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json())
+      ])
+        .then(([analytics, users, listings]) => {
+          analyticsNode.textContent = `Users: ${analytics.users}, Hosts: ${analytics.hosts}, Chats: ${analytics.chats}`;
+          usersNode.textContent = `${users.length} accounts total`;
+          listingsNode.textContent = `${listings.length} listings total`;
+        })
+        .catch(() => {
+          analyticsNode.textContent = "Could not load analytics.";
+          usersNode.textContent = "Could not load user list.";
+          listingsNode.textContent = "Could not load listings.";
+        });
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", function () {
+      clearSession();
+      window.location.href = "./login.html";
+    });
+  </script>
+</body>
+</html>

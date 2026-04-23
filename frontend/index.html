@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>KEJA Mtaani | Student Housing Kenya</title>
+  <meta name="description" content="Find verified hostels, bedsitters, and one bedrooms near campus.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="preconnect" href="https://picsum.photos">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <div class="page-transition" id="pageTransition"></div>
+  <video class="bg-video" autoplay muted loop playsinline aria-hidden="true">
+    <source src="../../models/Abstract White Background 4K - Motion Graphics Background Loop - White Video Loop - Free Stock Footage 4K (1080p, h264).mp4" type="video/mp4">
+  </video>
+  <div class="bg-overlay" aria-hidden="true"></div>
+  <a href="#listingSection" class="skip-link">Skip to listings</a>
+
+  <header class="topbar glass">
+    <div class="container topbar-inner">
+      <div class="brand">
+        <strong>KEJA</strong>
+        <span>Mtaani</span>
+      </div>
+      <nav class="menu" id="menu">
+        <a href="#listingSection">Listings</a>
+        <a href="#hostSection">For Hosts</a>
+        <a href="./login.html">Host/Admin Login</a>
+      </nav>
+      <button id="menuBtn" class="icon-btn" aria-label="Open menu">☰</button>
+    </div>
+  </header>
+
+  <section class="hero container">
+    <div class="hero-main reveal slide-left">
+      <span class="tag">Campus housing that actually makes sense</span>
+      <h1>Find student homes in Kamulu, Joska, Ngondu and beyond.</h1>
+      <p>No broker confusion. Verified hosts. Direct chat. Fast booking.</p>
+      <div class="hero-actions">
+        <button class="btn btn-primary pulse" id="ctaBrowse">Browse Homes</button>
+        <button class="btn btn-secondary" id="ctaHow">How it works</button>
+      </div>
+    </div>
+    <aside class="hero-side reveal slide-right">
+      <h2>Live KEJA Stats</h2>
+      <div class="stats">
+        <div><strong id="verifiedCount">0</strong><span>Verified hosts</span></div>
+        <div><strong id="bookingCount">0</strong><span>Viewings booked</span></div>
+        <div><strong id="reviewCount">0</strong><span>Student reviews</span></div>
+      </div>
+    </aside>
+  </section>
+
+  <section class="container search-wrap reveal slide-up">
+    <button class="filter-toggle btn btn-secondary" id="toggleFilters">Advanced Filters</button>
+    <form id="searchForm" class="search-grid expanded">
+      <div class="field">
+        <label for="location">Location</label>
+        <select id="location">
+          <option value="">Any location</option>
+          <option>Kamulu</option>
+          <option>Joska</option>
+          <option>Ngondu</option>
+          <option>Kanisani</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="priceRange">Max Price: <span id="priceLabel">KES 12000</span></label>
+        <input id="priceRange" type="range" min="3000" max="12000" value="12000" step="500">
+      </div>
+      <div class="field">
+        <label for="rentalType">Rental Type</label>
+        <select id="rentalType">
+          <option value="">Any type</option>
+          <option>Bedsitter</option>
+          <option>Single Room</option>
+          <option>One Bedroom</option>
+        </select>
+      </div>
+      <div class="field amenity-field">
+        <label>Amenities</label>
+        <div class="amenities">
+          <label><input type="checkbox" value="Wi-Fi"> Wi-Fi</label>
+          <label><input type="checkbox" value="Security"> Security</label>
+          <label><input type="checkbox" value="Water"> Water</label>
+          <label><input type="checkbox" value="CCTV"> CCTV</label>
+        </div>
+      </div>
+      <div class="field">
+        <label for="sortBy">Sort</label>
+        <select id="sortBy">
+          <option value="popular">Most popular</option>
+          <option value="low-price">Lowest price</option>
+          <option value="high-price">Highest price</option>
+          <option value="newest">Newest</option>
+        </select>
+      </div>
+      <button class="btn btn-primary" type="submit">Search</button>
+    </form>
+  </section>
+
+  <main id="listingSection" class="container">
+    <div class="row-between reveal slide-up">
+      <h2>Available Listings</h2>
+      <div class="row-gap">
+        <button class="btn btn-secondary" id="savedBtn" aria-pressed="false">Saved only</button>
+        <button class="btn btn-secondary" id="mapBtn">Map View</button>
+      </div>
+    </div>
+
+    <section class="map-box" id="mapBox"></section>
+    <section id="skeletonGrid" class="grid skeleton-grid"></section>
+    <section id="listingGrid" class="grid"></section>
+    <section id="emptyState" class="empty">No matching listings. Try another filter.</section>
+  </main>
+
+  <section class="container info-grid reveal slide-up" id="hostSection">
+    <article class="slide-left">
+      <h3>Host Registration</h3>
+      <p>Hosts register once, upload rooms, prices, amenities, and manage availability.</p>
+    </article>
+    <article class="slide-up">
+      <h3>Direct User ↔ Host Chat</h3>
+      <p>Students chat instantly from listing details. Messages are saved in database.</p>
+    </article>
+    <article class="slide-right" id="adminSection">
+      <h3>Hidden Admin Role</h3>
+      <p>Same login page supports admin role with moderation, analytics, and account controls.</p>
+    </article>
+  </section>
+
+  <div class="modal" id="detailsModal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="icon-btn modal-close" data-close="detailsModal">✕</button>
+      <div id="modalContent"></div>
+      <div class="row-gap">
+        <button class="btn btn-secondary" id="chatOpenBtn">Open Chat</button>
+        <button class="btn btn-primary" id="bookBtn">Book Viewing</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal" id="chatModal" aria-hidden="true">
+    <div class="modal-card">
+      <button class="icon-btn modal-close" data-close="chatModal">✕</button>
+      <h3>Chat with Host</h3>
+      <div id="chatLog" class="chat-log"></div>
+      <form id="chatForm" class="row-gap">
+        <input id="chatInput" placeholder="Type your message..." required>
+        <button class="btn btn-primary" type="submit">Send</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="bottom-sheet" id="mobileSheet">
+    <div class="sheet-handle"></div>
+    <h3>Book Viewing</h3>
+    <form id="bookingForm" class="sheet-form">
+      <input id="bookName" placeholder="Full name" required>
+      <input id="bookPhone" placeholder="07xx xxx xxx" required>
+      <input id="bookDate" type="date" required>
+      <button class="btn btn-primary" type="submit">Submit Request</button>
+    </form>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <script src="./app.js"></script>
+</body>
+</html>

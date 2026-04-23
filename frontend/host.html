@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Host Dashboard | KEJA</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <video class="bg-video" autoplay muted loop playsinline aria-hidden="true">
+    <source src="../../models/Abstract White Background 4K - Motion Graphics Background Loop - White Video Loop - Free Stock Footage 4K (1080p, h264).mp4" type="video/mp4">
+  </video>
+  <div class="bg-overlay" aria-hidden="true"></div>
+
+  <header class="topbar glass">
+    <div class="container topbar-inner">
+      <div class="brand"><strong>KEJA</strong><span>Mtaani</span></div>
+      <div class="row-gap">
+        <a class="btn btn-secondary" href="./index.html">Homepage</a>
+        <button class="btn btn-primary" id="logoutBtn">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="container" style="padding:18px 0 26px;">
+    <section class="hero-main reveal show slide-left">
+      <h1 style="font-size:2rem;">Host Dashboard</h1>
+      <p id="hostWelcome" class="meta" style="margin-bottom:10px;"></p>
+      <p class="meta">Manage your listings and see latest reviews from students.</p>
+    </section>
+
+    <section class="info-grid reveal show slide-up" style="margin-top:12px;">
+      <article>
+        <h3>Your Listings</h3>
+        <div id="hostListings" class="meta">Loading...</div>
+      </article>
+      <article>
+        <h3>Recent Reviews</h3>
+        <div id="hostReviews" class="meta">Loading...</div>
+      </article>
+      <article>
+        <h3>Quick Actions</h3>
+        <p class="meta">Add listing • Update availability • Reply to chats</p>
+      </article>
+    </section>
+  </main>
+
+  <script src="./auth.js"></script>
+  <script>
+    const session = requireRole(["host"]);
+    const welcome = document.getElementById("hostWelcome");
+    const listingsNode = document.getElementById("hostListings");
+    const reviewsNode = document.getElementById("hostReviews");
+
+    if (session) {
+      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
+      fetch(`${API_BASE_URL}/hosts/dashboard`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      })
+        .then((res) => res.json())
+        .then((data) => {
+          listingsNode.textContent = `${data.listings.length} listings available`;
+          reviewsNode.textContent = `${data.reviews.length} review records`;
+        })
+        .catch(() => {
+          listingsNode.textContent = "Could not load listings.";
+          reviewsNode.textContent = "Could not load reviews.";
+        });
+    }
+
+    document.getElementById("logoutBtn").addEventListener("click", function () {
+      clearSession();
+      window.location.href = "./login.html";
+    });
+  </script>
+</body>
+</html>
