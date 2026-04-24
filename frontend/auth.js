@@ -1,4 +1,7 @@
-const API_BASE_URL = "http://localhost:4000/api";
+const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE_URL = isLocalhost
+  ? "http://localhost:4000/api"
+  : `${window.location.origin}/api`;
 const AUTH_STORAGE_KEY = "keja.auth";
 
 function saveSession(payload) {
@@ -22,12 +25,17 @@ function clearSession() {
 }
 
 async function login(email, password) {
-  const response = await fetch(`${API_BASE_URL}/auth/login`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password })
-  });
-  const data = await response.json();
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password })
+    });
+  } catch (_err) {
+    throw new Error("Could not reach server. Start backend and check CORS/API URL.");
+  }
+  const data = await response.json().catch(() => ({}));
   if (!response.ok) {
     throw new Error(data.error || "Login failed");
   }

@@ -1,4 +1,7 @@
-const API_BASE_URL = "http://localhost:4000/api";
+const isLocalhost = ["localhost", "127.0.0.1"].includes(window.location.hostname);
+const API_BASE_URL = isLocalhost
+  ? "http://localhost:4000/api"
+  : `${window.location.origin}/api`;
 const listingGrid = document.getElementById("listingGrid");
 const skeletonGrid = document.getElementById("skeletonGrid");
 const emptyState = document.getElementById("emptyState");

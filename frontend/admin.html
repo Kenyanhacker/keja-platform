@@ -46,6 +46,35 @@
         <div id="listingsCount" class="meta">Loading...</div>
       </article>
     </section>
+
+    <section class="hero-main reveal show slide-up" style="margin-top:12px;">
+      <h3>Add Listing as Admin</h3>
+      <p class="meta" style="margin-bottom:10px;">Choose a host and publish a listing to public housing feed.</p>
+      <form id="adminListingForm" class="field" style="gap:8px;">
+        <label for="hostId">Host account</label>
+        <select id="hostId" required></select>
+        <label for="title">Title</label>
+        <input id="title" required placeholder="Listing title">
+        <label for="location">Location</label>
+        <input id="location" required placeholder="Kamulu / Joska / Ngondu">
+        <label for="price">Price (KES)</label>
+        <input id="price" type="number" min="0" required>
+        <label for="rentalType">Rental type</label>
+        <select id="rentalType" required>
+          <option value="Bedsitter">Bedsitter</option>
+          <option value="Single Room">Single Room</option>
+          <option value="One Bedroom">One Bedroom</option>
+        </select>
+        <label for="description">Description</label>
+        <input id="description" placeholder="Short description">
+        <label for="amenities">Amenities (comma separated)</label>
+        <input id="amenities" placeholder="Wi-Fi, Water, Security">
+        <label for="images">Image URLs (comma separated)</label>
+        <input id="images" placeholder="https://...jpg, https://...jpg">
+        <button class="btn btn-primary" type="submit">Publish Listing</button>
+      </form>
+      <p id="listingFormMsg" class="meta" style="margin-top:8px;"></p>
+    </section>
   </main>
 
   <script src="./auth.js"></script>
@@ -55,6 +84,16 @@
     const analyticsNode = document.getElementById("analytics");
     const usersNode = document.getElementById("usersCount");
     const listingsNode = document.getElementById("listingsCount");
+    const hostSelect = document.getElementById("hostId");
+    const listingForm = document.getElementById("adminListingForm");
+    const listingFormMsg = document.getElementById("listingFormMsg");
+
+    function parseCommaList(value) {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
 
     if (session) {
       welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
@@ -68,6 +107,10 @@
           analyticsNode.textContent = `Users: ${analytics.users}, Hosts: ${analytics.hosts}, Chats: ${analytics.chats}`;
           usersNode.textContent = `${users.length} accounts total`;
           listingsNode.textContent = `${listings.length} listings total`;
+          const hosts = users.filter((user) => user.role === "host" && user.status === "active");
+          hostSelect.innerHTML = hosts
+            .map((host) => `<option value="${host.id}">${host.full_name} (${host.email})</option>`)
+            .join("");
         })
         .catch(() => {
           analyticsNode.textContent = "Could not load analytics.";
@@ -75,6 +118,37 @@
           listingsNode.textContent = "Could not load listings.";
         });
     }
+
+    listingForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      listingFormMsg.textContent = "";
+      const payload = {
+        hostId: Number(document.getElementById("hostId").value),
+        title: document.getElementById("title").value.trim(),
+        location: document.getElementById("location").value.trim(),
+        price: Number(document.getElementById("price").value),
+        rentalType: document.getElementById("rentalType").value,
+        description: document.getElementById("description").value.trim(),
+        amenities: parseCommaList(document.getElementById("amenities").value),
+        images: parseCommaList(document.getElementById("images").value)
+      };
+      try {
+        const response = await fetch(`${API_BASE_URL}/listings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not add listing");
+        listingFormMsg.textContent = "Listing published successfully.";
+        listingForm.reset();
+      } catch (err) {
+        listingFormMsg.textContent = err.message;
+      }
+    });
 
     document.getElementById("logoutBtn").addEventListener("click", function () {
       clearSession();

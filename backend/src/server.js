@@ -12,7 +12,21 @@ const adminRoutes = require("./routes/admin");
 
 const app = express();
 
-app.use(cors({ origin: process.env.CORS_ORIGIN }));
+const allowedOrigins = (process.env.CORS_ORIGIN || "")
+  .split(",")
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+app.use(
+  cors({
+    origin(origin, callback) {
+      // Allow browserless tools and same-origin calls
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      return callback(new Error("CORS blocked for origin: " + origin));
+    }
+  })
+);
 app.use(express.json());
 
 app.get("/api/health", async (_req, res) => {

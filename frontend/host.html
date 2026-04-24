@@ -46,6 +46,32 @@
         <p class="meta">Add listing • Update availability • Reply to chats</p>
       </article>
     </section>
+
+    <section class="hero-main reveal show slide-up" style="margin-top:12px;">
+      <h3>Add New Listing</h3>
+      <form id="hostListingForm" class="field" style="gap:8px; margin-top:8px;">
+        <label for="title">Title</label>
+        <input id="title" required placeholder="Listing title">
+        <label for="location">Location</label>
+        <input id="location" required placeholder="Kamulu / Joska / Ngondu">
+        <label for="price">Price (KES)</label>
+        <input id="price" type="number" min="0" required>
+        <label for="rentalType">Rental type</label>
+        <select id="rentalType" required>
+          <option value="Bedsitter">Bedsitter</option>
+          <option value="Single Room">Single Room</option>
+          <option value="One Bedroom">One Bedroom</option>
+        </select>
+        <label for="description">Description</label>
+        <input id="description" placeholder="Short description">
+        <label for="amenities">Amenities (comma separated)</label>
+        <input id="amenities" placeholder="Wi-Fi, Water, Security">
+        <label for="images">Image URLs (comma separated)</label>
+        <input id="images" placeholder="https://...jpg, https://...jpg">
+        <button class="btn btn-primary" type="submit">Publish Listing</button>
+      </form>
+      <p id="listingMsg" class="meta" style="margin-top:8px;"></p>
+    </section>
   </main>
 
   <script src="./auth.js"></script>
@@ -54,6 +80,15 @@
     const welcome = document.getElementById("hostWelcome");
     const listingsNode = document.getElementById("hostListings");
     const reviewsNode = document.getElementById("hostReviews");
+    const listingForm = document.getElementById("hostListingForm");
+    const listingMsg = document.getElementById("listingMsg");
+
+    function parseCommaList(value) {
+      return value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean);
+    }
 
     if (session) {
       welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
@@ -70,6 +105,36 @@
           reviewsNode.textContent = "Could not load reviews.";
         });
     }
+
+    listingForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      listingMsg.textContent = "";
+      const payload = {
+        title: document.getElementById("title").value.trim(),
+        location: document.getElementById("location").value.trim(),
+        price: Number(document.getElementById("price").value),
+        rentalType: document.getElementById("rentalType").value,
+        description: document.getElementById("description").value.trim(),
+        amenities: parseCommaList(document.getElementById("amenities").value),
+        images: parseCommaList(document.getElementById("images").value)
+      };
+      try {
+        const response = await fetch(`${API_BASE_URL}/listings`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${session.token}`
+          },
+          body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not create listing");
+        listingMsg.textContent = "Listing published and visible on homepage.";
+        listingForm.reset();
+      } catch (err) {
+        listingMsg.textContent = err.message;
+      }
+    });
 
     document.getElementById("logoutBtn").addEventListener("click", function () {
       clearSession();

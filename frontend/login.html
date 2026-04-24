@@ -32,6 +32,18 @@
         <button class="btn btn-primary" type="submit">Sign in</button>
       </form>
       <p id="loginError" style="color:#b91c1c; margin-top:10px;"></p>
+      <hr style="margin:14px 0; border:none; border-top:1px solid rgba(0,0,0,0.12);">
+      <h3 style="margin-bottom:8px;">Create Host Account</h3>
+      <form id="hostRegisterForm" class="field" style="gap:8px;">
+        <label for="regName">Full name</label>
+        <input id="regName" placeholder="e.g. John Mwangi" required>
+        <label for="regEmail">Email</label>
+        <input id="regEmail" type="email" placeholder="host@email.com" required>
+        <label for="regPassword">Password</label>
+        <input id="regPassword" type="password" placeholder="Create password" required>
+        <button class="btn btn-secondary" type="submit">Create Host Account</button>
+      </form>
+      <p id="registerMsg" style="color:#1e3a8a; margin-top:8px;"></p>
       <div class="row-gap" style="margin-top:12px;">
         <a class="btn btn-secondary" href="./index.html">Back to homepage</a>
       </div>
@@ -42,6 +54,8 @@
   <script>
     const form = document.getElementById("loginForm");
     const errorEl = document.getElementById("loginError");
+    const registerForm = document.getElementById("hostRegisterForm");
+    const registerMsg = document.getElementById("registerMsg");
 
     const existing = getSession();
     if (existing && existing.user) {
@@ -67,6 +81,27 @@
         window.location.href = "./index.html";
       } catch (err) {
         errorEl.textContent = err.message;
+      }
+    });
+
+    registerForm.addEventListener("submit", async function (event) {
+      event.preventDefault();
+      registerMsg.textContent = "";
+      const fullName = document.getElementById("regName").value.trim();
+      const email = document.getElementById("regEmail").value.trim().toLowerCase();
+      const password = document.getElementById("regPassword").value;
+      try {
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fullName, email, password, role: "host" })
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || "Could not create account");
+        registerMsg.textContent = "Host account created. You can now login.";
+        registerForm.reset();
+      } catch (err) {
+        registerMsg.textContent = err.message;
       }
     });
   </script>

@@ -38,14 +38,36 @@ router.get("/", async (req, res) => {
   return res.json(result.rows);
 });
 
-router.post("/", requireAuth, requireRole("host"), async (req, res) => {
-  const { title, description, location, price, rentalType, amenities = [], images = [] } = req.body;
+router.post("/", requireAuth, requireRole("host", "admin"), async (req, res) => {
+  const {
+    title,
+    description,
+    location,
+    price,
+    rentalType,
+    amenities = [],
+    images = [],
+    hostId
+  } = req.body;
+  if (!title || !location || !price || !rentalType) {
+    return res.status(400).json({ error: "Missing required listing fields" });
+  }
+  const targetHostId = req.user.role === "admin" ? Number(hostId) : req.user.id;
+  if (!targetHostId) {
+    return res.status(400).json({ error: "Host selection is required" });
+  }
+  if (req.user.role === "admin") {
+    const hostResult = await db.query("SELECT id, role FROM users WHERE id = $1", [targetHostId]);
+    if (!hostResult.rows[0] || hostResult.rows[0].role !== "host") {
+      return res.status(400).json({ error: "Selected host is invalid" });
+    }
+  }
   const result = await db.query(
     `INSERT INTO listings
       (host_id, title, description, location, price, rental_type, amenities, image_urls)
      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
      RETURNING *`,
-    [req.user.id, title, description, location, price, rentalType, amenities, images]
+    [targetHostId, title, description || "", location, Number(price), rentalType, amenities, images]
   );
   return res.status(201).json(result.rows[0]);
 });
