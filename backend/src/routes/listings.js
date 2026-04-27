@@ -7,7 +7,12 @@ const router = express.Router();
 router.get("/", async (req, res) => {
   const { location, maxPrice, rentalType, sort = "popular" } = req.query;
   const values = [];
-  const where = ["l.status = 'active'"];
+  const where = [
+    "l.status = 'active'",
+    "l.is_available = TRUE",
+    "u.role = 'host'",
+    "u.status = 'active'"
+  ];
 
   if (location) {
     values.push(location);
@@ -38,6 +43,32 @@ router.get("/", async (req, res) => {
   return res.json(result.rows);
 });
 
+router.get("/stats", async (_req, res) => {
+  const [totalHouses, availableHouses, hosts, users] = await Promise.all([
+    db.query(
+      `SELECT COUNT(*)::int AS count
+       FROM listings l
+       JOIN users u ON u.id = l.host_id
+       WHERE l.status = 'active' AND u.role = 'host' AND u.status = 'active'`
+    ),
+    db.query(
+      `SELECT COUNT(*)::int AS count
+       FROM listings l
+       JOIN users u ON u.id = l.host_id
+       WHERE l.status = 'active' AND l.is_available = TRUE AND u.role = 'host' AND u.status = 'active'`
+    ),
+    db.query("SELECT COUNT(*)::int AS count FROM users WHERE role = 'host' AND status = 'active'"),
+    db.query("SELECT COUNT(*)::int AS count FROM users WHERE role = 'user' AND status = 'active'")
+  ]);
+
+  return res.json({
+    totalHouses: totalHouses.rows[0].count,
+    availableHouses: availableHouses.rows[0].count,
+    hosts: hosts.rows[0].count,
+    users: users.rows[0].count
+  });
+});
+
 router.post("/", requireAuth, requireRole("host", "admin"), async (req, res) => {
   const {
     title,
@@ -56,11 +87,9 @@ router.post("/", requireAuth, requireRole("host", "admin"), async (req, res) => 
   if (!targetHostId) {
     return res.status(400).json({ error: "Host selection is required" });
   }
-  if (req.user.role === "admin") {
-    const hostResult = await db.query("SELECT id, role FROM users WHERE id = $1", [targetHostId]);
-    if (!hostResult.rows[0] || hostResult.rows[0].role !== "host") {
-      return res.status(400).json({ error: "Selected host is invalid" });
-    }
+  const hostResult = await db.query("SELECT id, role, status FROM users WHERE id = $1", [targetHostId]);
+  if (!hostResult.rows[0] || hostResult.rows[0].role !== "host" || hostResult.rows[0].status !== "active") {
+    return res.status(400).json({ error: "Selected host is invalid" });
   }
   const result = await db.query(
     `INSERT INTO listings
@@ -72,12 +101,15 @@ router.post("/", requireAuth, requireRole("host", "admin"), async (req, res) => 
   return res.status(201).json(result.rows[0]);
 });
 
-router.patch("/:id/availability", requireAuth, requireRole("host"), async (req, res) => {
+router.patch("/:id/availability", requireAuth, requireRole("host", "admin"), async (req, res) => {
   const { available } = req.body;
-  const result = await db.query(
-    "UPDATE listings SET is_available = $1 WHERE id = $2 AND host_id = $3 RETURNING *",
-    [available, req.params.id, req.user.id]
-  );
+  const query = req.user.role === "admin"
+    ? "UPDATE listings SET is_available = $1 WHERE id = $2 RETURNING *"
+    : "UPDATE listings SET is_available = $1 WHERE id = $2 AND host_id = $3 RETURNING *";
+  const params = req.user.role === "admin"
+    ? [available, req.params.id]
+    : [available, req.params.id, req.user.id];
+  const result = await db.query(query, params);
   if (!result.rows[0]) return res.status(404).json({ error: "Listing not found" });
   return res.json(result.rows[0]);
 });

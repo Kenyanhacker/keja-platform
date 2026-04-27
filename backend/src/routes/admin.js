@@ -45,14 +45,41 @@ router.patch("/users/:id/status", async (req, res) => {
   if (!["active", "suspended", "banned"].includes(status)) {
     return res.status(400).json({ error: "Invalid status" });
   }
-  const result = await db.query("UPDATE users SET status = $1 WHERE id = $2 RETURNING id, status", [status, req.params.id]);
+  const result = await db.query(
+    "UPDATE users SET status = $1 WHERE id = $2 AND role <> 'admin' RETURNING id, status",
+    [status, req.params.id]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: "User not found or cannot be modified" });
   return res.json(result.rows[0]);
 });
 
 router.patch("/listings/:id/status", async (req, res) => {
   const { status } = req.body;
+  if (!["active", "flagged", "removed"].includes(status)) {
+    return res.status(400).json({ error: "Invalid listing status" });
+  }
   const result = await db.query("UPDATE listings SET status = $1 WHERE id = $2 RETURNING id, status", [status, req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ error: "Listing not found" });
   return res.json(result.rows[0]);
+});
+
+router.patch("/users/:id/role", async (req, res) => {
+  const { role } = req.body;
+  if (!["user", "host", "admin"].includes(role)) {
+    return res.status(400).json({ error: "Invalid role" });
+  }
+  const result = await db.query(
+    "UPDATE users SET role = $1 WHERE id = $2 AND role <> 'admin' RETURNING id, role",
+    [role, req.params.id]
+  );
+  if (!result.rows[0]) return res.status(404).json({ error: "User not found or cannot be modified" });
+  return res.json(result.rows[0]);
+});
+
+router.delete("/listings/:id", async (req, res) => {
+  const result = await db.query("DELETE FROM listings WHERE id = $1 RETURNING id", [req.params.id]);
+  if (!result.rows[0]) return res.status(404).json({ error: "Listing not found" });
+  return res.status(204).send();
 });
 
 module.exports = router;
