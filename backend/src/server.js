@@ -9,6 +9,7 @@ const hostRoutes = require("./routes/hosts");
 const chatRoutes = require("./routes/chat");
 const reviewRoutes = require("./routes/reviews");
 const adminRoutes = require("./routes/admin");
+const viewingsRoutes = require("./routes/viewings");
 
 const app = express();
 
@@ -40,6 +41,7 @@ app.use("/api/hosts", hostRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/api/reviews", reviewRoutes);
 app.use("/api/admin", adminRoutes);
+app.use("/api/viewings", viewingsRoutes);
 
 app.use((err, _req, res, _next) => {
   console.error(err);

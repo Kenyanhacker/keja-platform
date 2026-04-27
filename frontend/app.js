@@ -12,14 +12,9 @@ const state = {
   savedOnly: false,
   saved: JSON.parse(localStorage.getItem("keja.saved") || "[]"),
   selectedListingId: null,
-  listings: []
+  listings: [],
+  session: null
 };
-
-const sampleListings = [
-  { id: 1, title: "Clean Bedsitter near Stage", location: "Kamulu", rental_type: "Bedsitter", price: 6500, popularity_score: 92, host_name: "Jane Wanjiku", amenities: ["Wi-Fi", "Water", "Security"], image_urls: ["https://picsum.photos/seed/kejaA/700/500"], status_badge: "Verified Host", map_url: "https://www.google.com/maps/search/Kamulu" },
-  { id: 2, title: "One Bedroom with Balcony", location: "Joska", rental_type: "One Bedroom", price: 8500, popularity_score: 88, host_name: "Brian Omondi", amenities: ["CCTV", "Water", "Security"], image_urls: ["https://picsum.photos/seed/kejaB/700/500"], status_badge: "Near Campus", map_url: "https://www.google.com/maps/search/Joska" },
-  { id: 3, title: "Budget Single Room", location: "Ngondu", rental_type: "Single Room", price: 4800, popularity_score: 79, host_name: "Faith Achieng", amenities: ["Water", "Security"], image_urls: ["https://picsum.photos/seed/kejaC/700/500"], status_badge: "Student Choice", map_url: "https://www.google.com/maps/search/Ngondu" }
-];
 
 function showToast(message) {
   toast.textContent = message;
@@ -39,6 +34,15 @@ function animateCount(id, target) {
     }
     el.textContent = String(current);
   }, 18);
+}
+
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed");
+  }
+  return data;
 }
 
 function enable3DHover(card) {
@@ -61,7 +65,7 @@ function listingTemplate(item) {
     <article data-id="${item.id}">
       <span class="badge">${item.status_badge || "Verified"}</span>
       <button class="save ${isSaved ? "active" : ""}" data-save="${item.id}" aria-label="Save listing">${isSaved ? "♥" : "♡"}</button>
-      <img class="cover" src="${item.image_urls[0]}" loading="lazy" alt="${item.title}">
+      <img class="cover" src="${(item.image_urls && item.image_urls[0]) || "https://picsum.photos/seed/keja-default/700/500"}" loading="lazy" alt="${item.title}">
       <div class="card-body">
         <h3>${item.title}</h3>
         <p class="meta">${item.location} • ${item.rental_type} • KES ${item.price.toLocaleString()}</p>
@@ -147,16 +151,27 @@ function createSkeletons() {
 
 async function fetchListings() {
   createSkeletons();
+  emptyState.style.display = "none";
   try {
-    const res = await fetch(`${API_BASE_URL}/listings`);
-    if (!res.ok) throw new Error("API unavailable");
-    state.listings = await res.json();
-  } catch (_err) {
-    state.listings = sampleListings;
-    showToast("Using offline sample data.");
+    state.listings = await fetchJson(`${API_BASE_URL}/listings`);
+  } catch (err) {
+    state.listings = [];
+    emptyState.textContent = `Could not load listings: ${err.message}`;
   } finally {
     skeletonGrid.innerHTML = "";
     renderListings();
+  }
+}
+
+async function loadLiveStats() {
+  try {
+    const stats = await fetchJson(`${API_BASE_URL}/listings/stats`);
+    animateCount("totalHousesCount", stats.totalHouses);
+    animateCount("availableHousesCount", stats.availableHouses);
+    animateCount("hostsCount", stats.hosts);
+    animateCount("usersCount", stats.users);
+  } catch (err) {
+    showToast(`Stats unavailable: ${err.message}`);
   }
 }
 
@@ -212,14 +227,32 @@ function openBooking(id) {
 }
 
 async function sendChat(message) {
-  const token = localStorage.getItem("keja.token");
+  const token = state.session && state.session.token;
   if (!token || !state.selectedListingId) return false;
-  const res = await fetch(`${API_BASE_URL}/chat/${state.selectedListingId}`, {
+  await fetchJson(`${API_BASE_URL}/chat/${state.selectedListingId}`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify({ message })
   });
-  return res.ok;
+  return true;
+}
+
+async function submitViewingRequest() {
+  const token = state.session && state.session.token;
+  if (!token || !state.selectedListingId) {
+    throw new Error("Login required to request a viewing");
+  }
+
+  await fetchJson(`${API_BASE_URL}/viewings/${state.selectedListingId}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify({
+      fullName: document.getElementById("bookName").value.trim(),
+      phone: document.getElementById("bookPhone").value.trim(),
+      preferredDate: document.getElementById("bookDate").value,
+      notes: ""
+    })
+  });
 }
 
 function setupEvents() {
@@ -284,7 +317,12 @@ function setupEvents() {
     const input = document.getElementById("chatInput");
     const message = input.value.trim();
     if (!message) return;
-    const ok = await sendChat(message);
+    let ok = false;
+    try {
+      ok = await sendChat(message);
+    } catch (err) {
+      showToast(err.message);
+    }
     const log = document.getElementById("chatLog");
     const bubble = document.createElement("div");
     bubble.className = "bubble";
@@ -294,6 +332,11 @@ function setupEvents() {
   });
 
   document.getElementById("bookBtn").addEventListener("click", () => {
+    if (!state.session) {
+      showToast("Login first to request viewing");
+      window.location.href = "./login.html";
+      return;
+    }
     if (window.innerWidth <= 720) {
       closeModal("detailsModal");
       document.getElementById("mobileSheet").classList.add("open");
@@ -302,14 +345,19 @@ function setupEvents() {
     }
   });
 
-  document.getElementById("bookingForm").addEventListener("submit", (e) => {
+  document.getElementById("bookingForm").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const sheet = document.getElementById("mobileSheet");
-    sheet.classList.add("slide-out-down");
-    setTimeout(() => {
-      sheet.classList.remove("open", "slide-out-down");
-    }, 260);
-    showToast("Viewing request submitted.");
+    try {
+      await submitViewingRequest();
+      const sheet = document.getElementById("mobileSheet");
+      sheet.classList.add("slide-out-down");
+      setTimeout(() => {
+        sheet.classList.remove("open", "slide-out-down");
+      }, 260);
+      showToast("Viewing request submitted.");
+    } catch (err) {
+      showToast(err.message);
+    }
   });
 }
 
@@ -326,11 +374,16 @@ function revealOnScroll() {
 }
 
 function boot() {
+  state.session = (() => {
+    try {
+      return JSON.parse(localStorage.getItem("keja.auth") || "null");
+    } catch (_err) {
+      return null;
+    }
+  })();
   setupEvents();
   revealOnScroll();
-  animateCount("verifiedCount", 214);
-  animateCount("bookingCount", 1289);
-  animateCount("reviewCount", 975);
+  loadLiveStats();
   fetchListings();
 }
 

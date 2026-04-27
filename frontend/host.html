@@ -76,7 +76,7 @@
 
   <script src="./auth.js"></script>
   <script>
-    const session = requireRole(["host"]);
+    let session = null;
     const welcome = document.getElementById("hostWelcome");
     const listingsNode = document.getElementById("hostListings");
     const reviewsNode = document.getElementById("hostReviews");
@@ -90,21 +90,71 @@
         .filter(Boolean);
     }
 
-    if (session) {
-      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
-      fetch(`${API_BASE_URL}/hosts/dashboard`, {
-        headers: { Authorization: `Bearer ${session.token}` }
-      })
-        .then((res) => res.json())
-        .then((data) => {
-          listingsNode.textContent = `${data.listings.length} listings available`;
-          reviewsNode.textContent = `${data.reviews.length} review records`;
-        })
-        .catch(() => {
-          listingsNode.textContent = "Could not load listings.";
-          reviewsNode.textContent = "Could not load reviews.";
-        });
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Request failed");
+      return data;
     }
+
+    function listingRow(listing) {
+      return `
+        <div style="padding:6px 0; border-bottom:1px solid rgba(0,0,0,0.08);">
+          <strong>${listing.title}</strong> (${listing.location}) - KES ${Number(listing.price).toLocaleString()}
+          <div class="row-gap" style="margin-top:6px;">
+            <span>${listing.is_available ? "Available" : "Not available"}</span>
+            <button class="btn btn-secondary" data-toggle="${listing.id}" data-next="${!listing.is_available}">
+              Mark ${listing.is_available ? "Unavailable" : "Available"}
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    async function loadHostDashboard() {
+      const data = await fetchJson(`${API_BASE_URL}/hosts/dashboard`, {
+        headers: { Authorization: `Bearer ${session.token}` }
+      });
+      listingsNode.innerHTML = data.listings.length
+        ? data.listings.map(listingRow).join("")
+        : "No listings yet.";
+      reviewsNode.innerHTML = data.reviews.length
+        ? data.reviews.map((review) => `<div style="padding:4px 0;">${review.rating}/5 - ${review.comment || "No comment"} (${review.reviewer_name})</div>`).join("")
+        : "No reviews yet.";
+
+      listingsNode.querySelectorAll("[data-toggle]").forEach((button) => {
+        button.addEventListener("click", async () => {
+          const listingId = Number(button.dataset.toggle);
+          const nextValue = button.dataset.next === "true";
+          try {
+            await fetchJson(`${API_BASE_URL}/listings/${listingId}/availability`, {
+              method: "PATCH",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${session.token}`
+              },
+              body: JSON.stringify({ available: nextValue })
+            });
+            await loadHostDashboard();
+          } catch (err) {
+            listingMsg.textContent = err.message;
+          }
+        });
+      });
+    }
+
+    (async function bootstrapHost() {
+      session = await restoreSession();
+      session = requireRole(["host"]);
+      if (!session) return;
+      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
+      try {
+        await loadHostDashboard();
+      } catch (err) {
+        listingsNode.textContent = `Could not load listings: ${err.message}`;
+        reviewsNode.textContent = `Could not load reviews: ${err.message}`;
+      }
+    })();
 
     listingForm.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -131,6 +181,7 @@
         if (!response.ok) throw new Error(data.error || "Could not create listing");
         listingMsg.textContent = "Listing published and visible on homepage.";
         listingForm.reset();
+        await loadHostDashboard();
       } catch (err) {
         listingMsg.textContent = err.message;
       }

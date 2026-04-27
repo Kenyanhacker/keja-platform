@@ -57,11 +57,13 @@
     const registerForm = document.getElementById("hostRegisterForm");
     const registerMsg = document.getElementById("registerMsg");
 
-    const existing = getSession();
-    if (existing && existing.user) {
-      if (existing.user.role === "admin") window.location.href = "./admin.html";
-      if (existing.user.role === "host") window.location.href = "./host.html";
-    }
+    (async function bootstrapSession() {
+      const existing = await restoreSession();
+      if (existing && existing.user) {
+        if (existing.user.role === "admin") window.location.href = "./admin.html";
+        if (existing.user.role === "host") window.location.href = "./host.html";
+      }
+    })();
 
     form.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -69,6 +71,7 @@
       const email = document.getElementById("email").value.trim().toLowerCase();
       const password = document.getElementById("password").value;
       try {
+        form.querySelector("button[type='submit']").disabled = true;
         const data = await login(email, password);
         if (data.user.role === "admin") {
           window.location.href = "./admin.html";
@@ -81,6 +84,8 @@
         window.location.href = "./index.html";
       } catch (err) {
         errorEl.textContent = err.message;
+      } finally {
+        form.querySelector("button[type='submit']").disabled = false;
       }
     });
 
@@ -91,6 +96,7 @@
       const email = document.getElementById("regEmail").value.trim().toLowerCase();
       const password = document.getElementById("regPassword").value;
       try {
+        registerForm.querySelector("button[type='submit']").disabled = true;
         const response = await fetch(`${API_BASE_URL}/auth/register`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -102,6 +108,8 @@
         registerForm.reset();
       } catch (err) {
         registerMsg.textContent = err.message;
+      } finally {
+        registerForm.querySelector("button[type='submit']").disabled = false;
       }
     });
   </script>

@@ -43,6 +43,37 @@ async function login(email, password) {
   return data;
 }
 
+async function fetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(data.error || "Request failed");
+  }
+  return data;
+}
+
+async function restoreSession() {
+  const session = getSession();
+  if (!session || !session.token) return null;
+  try {
+    const data = await fetchJson(`${API_BASE_URL}/auth/me`, {
+      headers: { Authorization: `Bearer ${session.token}` }
+    });
+    const nextSession = { token: session.token, user: data.user };
+    saveSession(nextSession);
+    return nextSession;
+  } catch (_err) {
+    clearSession();
+    return null;
+  }
+}
+
+function authHeaders(token) {
+  return {
+    Authorization: `Bearer ${token}`
+  };
+}
+
 function requireRole(roles) {
   const session = getSession();
   if (!session || !session.user || !roles.includes(session.user.role)) {

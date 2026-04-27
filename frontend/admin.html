@@ -75,11 +75,21 @@
       </form>
       <p id="listingFormMsg" class="meta" style="margin-top:8px;"></p>
     </section>
+
+    <section class="hero-main reveal show slide-up" style="margin-top:12px;">
+      <h3>Manage Users</h3>
+      <div id="usersList" class="meta">Loading users...</div>
+    </section>
+
+    <section class="hero-main reveal show slide-up" style="margin-top:12px;">
+      <h3>Manage Listings</h3>
+      <div id="listingsList" class="meta">Loading listings...</div>
+    </section>
   </main>
 
   <script src="./auth.js"></script>
   <script>
-    const session = requireRole(["admin"]);
+    let session = null;
     const welcome = document.getElementById("adminWelcome");
     const analyticsNode = document.getElementById("analytics");
     const usersNode = document.getElementById("usersCount");
@@ -87,6 +97,10 @@
     const hostSelect = document.getElementById("hostId");
     const listingForm = document.getElementById("adminListingForm");
     const listingFormMsg = document.getElementById("listingFormMsg");
+    const usersList = document.getElementById("usersList");
+    const listingsList = document.getElementById("listingsList");
+    let cachedUsers = [];
+    let cachedListings = [];
 
     function parseCommaList(value) {
       return value
@@ -95,29 +109,79 @@
         .filter(Boolean);
     }
 
-    if (session) {
-      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
-
-      Promise.all([
-        fetch(`${API_BASE_URL}/admin/analytics`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json()),
-        fetch(`${API_BASE_URL}/admin/users`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json()),
-        fetch(`${API_BASE_URL}/admin/listings`, { headers: { Authorization: `Bearer ${session.token}` } }).then((r) => r.json())
-      ])
-        .then(([analytics, users, listings]) => {
-          analyticsNode.textContent = `Users: ${analytics.users}, Hosts: ${analytics.hosts}, Chats: ${analytics.chats}`;
-          usersNode.textContent = `${users.length} accounts total`;
-          listingsNode.textContent = `${listings.length} listings total`;
-          const hosts = users.filter((user) => user.role === "host" && user.status === "active");
-          hostSelect.innerHTML = hosts
-            .map((host) => `<option value="${host.id}">${host.full_name} (${host.email})</option>`)
-            .join("");
-        })
-        .catch(() => {
-          analyticsNode.textContent = "Could not load analytics.";
-          usersNode.textContent = "Could not load user list.";
-          listingsNode.textContent = "Could not load listings.";
-        });
+    async function fetchJson(url, options = {}) {
+      const response = await fetch(url, options);
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) throw new Error(data.error || "Request failed");
+      return data;
     }
+
+    function authHeaders() {
+      return { Authorization: `Bearer ${session.token}` };
+    }
+
+    function renderUsers() {
+      usersList.innerHTML = cachedUsers.map((user) => `
+        <div style="padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.08);">
+          <strong>${user.full_name}</strong> (${user.email}) - role: ${user.role}, status: ${user.status}
+          <div class="row-gap" style="margin-top:6px;">
+            <button class="btn btn-secondary" data-user-status="${user.id}" data-status="active">Set Active</button>
+            <button class="btn btn-secondary" data-user-status="${user.id}" data-status="suspended">Suspend</button>
+            <button class="btn btn-secondary" data-user-role="${user.id}" data-role="host">Make Host</button>
+            <button class="btn btn-secondary" data-user-role="${user.id}" data-role="user">Make User</button>
+          </div>
+        </div>
+      `).join("") || "No users found.";
+    }
+
+    function renderListings() {
+      listingsList.innerHTML = cachedListings.map((listing) => `
+        <div style="padding:8px 0; border-bottom:1px solid rgba(0,0,0,0.08);">
+          <strong>${listing.title}</strong> (${listing.host_name}) - status: ${listing.status}
+          <div class="row-gap" style="margin-top:6px;">
+            <button class="btn btn-secondary" data-listing-status="${listing.id}" data-status="active">Activate</button>
+            <button class="btn btn-secondary" data-listing-status="${listing.id}" data-status="flagged">Flag</button>
+            <button class="btn btn-secondary" data-listing-status="${listing.id}" data-status="removed">Remove</button>
+            <button class="btn btn-secondary" data-delete-listing="${listing.id}">Delete</button>
+          </div>
+        </div>
+      `).join("") || "No listings found.";
+    }
+
+    async function refreshAdminData() {
+      const [analytics, users, listings] = await Promise.all([
+        fetchJson(`${API_BASE_URL}/admin/analytics`, { headers: authHeaders() }),
+        fetchJson(`${API_BASE_URL}/admin/users`, { headers: authHeaders() }),
+        fetchJson(`${API_BASE_URL}/admin/listings`, { headers: authHeaders() })
+      ]);
+      cachedUsers = users;
+      cachedListings = listings;
+
+      analyticsNode.textContent = `Users: ${analytics.users}, Hosts: ${analytics.hosts}, Listings: ${analytics.listings}, Chats: ${analytics.chats}`;
+      usersNode.textContent = `${users.length} accounts total`;
+      listingsNode.textContent = `${listings.length} listings total`;
+      const hosts = users.filter((user) => user.role === "host" && user.status === "active");
+      hostSelect.innerHTML = hosts
+        .map((host) => `<option value="${host.id}">${host.full_name} (${host.email})</option>`)
+        .join("");
+
+      renderUsers();
+      renderListings();
+    }
+
+    (async function bootstrapAdmin() {
+      session = await restoreSession();
+      session = requireRole(["admin"]);
+      if (!session) return;
+      welcome.textContent = `Signed in as ${session.user.fullName} (${session.user.email})`;
+      try {
+        await refreshAdminData();
+      } catch (err) {
+        analyticsNode.textContent = `Could not load analytics: ${err.message}`;
+        usersNode.textContent = "Could not load user list.";
+        listingsNode.textContent = "Could not load listings.";
+      }
+    })();
 
     listingForm.addEventListener("submit", async function (event) {
       event.preventDefault();
@@ -145,6 +209,57 @@
         if (!response.ok) throw new Error(data.error || "Could not add listing");
         listingFormMsg.textContent = "Listing published successfully.";
         listingForm.reset();
+        await refreshAdminData();
+      } catch (err) {
+        listingFormMsg.textContent = err.message;
+      }
+    });
+
+    usersList.addEventListener("click", async (event) => {
+      const statusButton = event.target.closest("[data-user-status]");
+      const roleButton = event.target.closest("[data-user-role]");
+      try {
+        if (statusButton) {
+          await fetchJson(`${API_BASE_URL}/admin/users/${statusButton.dataset.userStatus}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ status: statusButton.dataset.status })
+          });
+          await refreshAdminData();
+        }
+        if (roleButton) {
+          await fetchJson(`${API_BASE_URL}/admin/users/${roleButton.dataset.userRole}/role`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ role: roleButton.dataset.role })
+          });
+          await refreshAdminData();
+        }
+      } catch (err) {
+        listingFormMsg.textContent = err.message;
+      }
+    });
+
+    listingsList.addEventListener("click", async (event) => {
+      const statusButton = event.target.closest("[data-listing-status]");
+      const deleteButton = event.target.closest("[data-delete-listing]");
+      try {
+        if (statusButton) {
+          await fetchJson(`${API_BASE_URL}/admin/listings/${statusButton.dataset.listingStatus}/status`, {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json", ...authHeaders() },
+            body: JSON.stringify({ status: statusButton.dataset.status })
+          });
+          await refreshAdminData();
+        }
+        if (deleteButton) {
+          const response = await fetch(`${API_BASE_URL}/admin/listings/${deleteButton.dataset.deleteListing}`, {
+            method: "DELETE",
+            headers: authHeaders()
+          });
+          if (!response.ok) throw new Error("Could not delete listing");
+          await refreshAdminData();
+        }
       } catch (err) {
         listingFormMsg.textContent = err.message;
       }
